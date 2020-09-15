@@ -14,7 +14,7 @@ char* readline(char* prompt) {
 }
 
 /* the fake add_history function */
-void add_history(){char* unused}
+void add_history(char* unused){}
 #else
 #include <editline/readline.h> /* readline() */
 #include <editline/history.h>  /* add_history() */
