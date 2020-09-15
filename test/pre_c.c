@@ -5,7 +5,7 @@
 static char buffer[2048];
 /* the fake readline function */
 char* readline(char* prompt) {
-    fputs("prompt", stdout);
+    fputs(prompt, stdout);
     fgets(buffer, 2048, stdin);
     char* cpy = malloc(strlen(buffer)+1);
     strcpy(cpy, buffer);
@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
             puts("bye!");
             break;
         }
-        puts("Yes!You are right!");
+        puts("Yeah! You are right!");
         free(input);
     }
 
