@@ -25,6 +25,35 @@ void add_history(char* unused){}
 
 #define QUIT "quit()"
 
+long eval_op(long x, char* op, long y) {
+    if(strcmp(op, "+") == 0 || strcmp(op, "add") == 0) { return x + y; }
+    if(strcmp(op, "-") == 0 || strcmp(op, "sub") == 0) { return x - y; }
+    if(strcmp(op, "*") == 0 || strcmp(op, "mul") == 0) { return x * y; }
+    if(strcmp(op, "/") == 0 || strcmp(op, "div") == 0) { return x / y; }
+    if(strcmp(op, "%") == 0) { return x % y; }
+}
+
+long eval(mpc_ast_t* t) {
+    /* if tagged as number return it directly */
+    if (strstr(t->tag, "number")) {
+        return atoi(t->contents);
+    }
+
+    /* the op is always second child */
+    char* op = t->children[1]->contents;
+
+    /* store the third child in 'x' */
+    long x = eval(t->children[2]);
+
+    /* iterate the remaining children and combining */
+    int i = 3;
+    while(strstr(t->children[i]->tag, "expr")) {
+        x = eval_op(x, op, eval(t->children[i]));
+        i++;
+    }
+    return x;
+}
+
 int main(int argc, char** argv) {
     /* create some parsers */
     mpc_parser_t* Number   = mpc_new("number");
@@ -35,11 +64,12 @@ int main(int argc, char** argv) {
     puts("boring");
 
     mpca_lang(MPCA_LANG_DEFAULT, 
-        "                                                \
-            number: /-?[0-9]+/;                          \
-            operator: '+' | '-' | '*' | '/';             \
-            expr: <number> | '(' <operator> <expr>+ ')'; \
-            jisp: /^/ <operator> <expr>+ /$/;            \
+        "                                                          \
+            number: /-?[1-9]+/;                                    \
+            operator: '+' | '-' | '*' | '/' | '%' |                \
+            \"add\" | \"sub\" | \"mul\" | \"div\" |;               \
+            expr: <number> | '(' <operator> <expr>+ ')';           \
+            jisp: /^/ <operator> <expr>+ /$/;                      \
         ",
     Number, Operator, Expr, Jisp
     );
@@ -60,8 +90,9 @@ int main(int argc, char** argv) {
 
         mpc_result_t r;
         if(mpc_parse("<stdin>", input, Jisp, &r)) {
-            /* if success print the AST */
-            mpc_ast_print(r.output);
+            /* if success, print the result */
+            long result = eval(r.output);
+            printf("%li\n", result);
             mpc_ast_delete(r.output);
         } else {
             /* otherwise print the error */
