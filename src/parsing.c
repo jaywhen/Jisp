@@ -136,30 +136,6 @@ lval* lval_read(mpc_ast_t* t) {
     return x;
 }
 
-// lval* lval_read(mpc_ast_t* t) {
-
-//   /* If Symbol or Number return conversion to that type */
-//   if (strstr(t->tag, "number")) { return lval_read_num(t); }
-//   if (strstr(t->tag, "symbol")) { return lval_sym(t->contents); }
-
-//   /* If root (>) or sexpr then create empty list */
-//   lval* x = NULL;
-//   if (strcmp(t->tag, ">") == 0) { x = lval_sexpr(); } 
-//   if (strstr(t->tag, "sexpr"))  { x = lval_sexpr(); }
-
-//   /* Fill this list with any valid expression contained within */
-//   for (int i = 0; i < t->children_num; i++) {
-//     if (strcmp(t->children[i]->contents, "(") == 0) { continue; }
-//     if (strcmp(t->children[i]->contents, ")") == 0) { continue; }
-//     if (strcmp(t->children[i]->contents, "}") == 0) { continue; }
-//     if (strcmp(t->children[i]->contents, "{") == 0) { continue; }
-//     if (strcmp(t->children[i]->tag,  "regex") == 0) { continue; }
-//     x = lval_add(x, lval_read(t->children[i]));
-//   }
-
-//   return x;
-// }
-
 void lval_expr_print(lval* v, char open, char close) {
     putchar(open);
     for(size_t i = 0; i < v->count; i++) {
@@ -283,18 +259,6 @@ lval* lval_eval(lval* v) {
     /* all other lval types remain the same */
     return v;
 }
-
-// --------------------------above is new--------------------------
-
-
-// long eval_op(long x, char* op, long y) {
-//     if(strcmp(op, "+") == 0 || strcmp(op, "add") == 0) { return x + y; }
-//     if(strcmp(op, "-") == 0 || strcmp(op, "sub") == 0) { return x - y; }
-//     if(strcmp(op, "*") == 0 || strcmp(op, "mul") == 0) { return x * y; }
-//     if(strcmp(op, "/") == 0 || strcmp(op, "div") == 0) { return x / y; }
-//     if(strcmp(op, "%") == 0) { return x % y; }
-// }
-
 
 int main(int argc, char** argv) {
     /* create some parsers */
