@@ -3,21 +3,6 @@
 #include <stdlib.h> /* free() */
 #include <string.h> /* strcmp() */
 
-typedef struct lval
-{
-    int type;
-    long num;
-    /* error and symbol types have some string data */
-    char* err;
-    char* sym;
-    /* count and pointer to a list of "lval*" */
-    int count;
-    struct lval** cell;
-} lval;
-
-enum {LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_SEXPR};
-// enum {LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM};
-
 #ifdef _WIN32
 static char buffer[2048];
 /* the fake readline function */
@@ -37,13 +22,24 @@ void add_history(char* unused){}
 #include <editline/history.h>  /* add_history() */
 #endif
 
-
 #define QUIT "quit()"
 
-void lval_print(lval* v);
-// void lval_expr_print(lval* v, char open, char close);
-lval* lval_eval(lval* v);
+typedef struct lval
+{
+    int type;
+    long num;
+    /* error and symbol types have some string data */
+    char* err;
+    char* sym;
+    /* count and pointer to a list of "lval*" */
+    int count;
+    struct lval** cell;
+} lval;
 
+enum {LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR};
+
+void lval_print(lval* v);
+lval* lval_eval(lval* v);
 
 /* Construct a pointer to a new Number lval */ 
 lval* lval_num(long x) {
@@ -72,13 +68,23 @@ lval* lval_sym(char* s) {
 }
 
 /* A pointer to a new empty Sexpr lval */
-lval* lval_sexpr(void) {
+lval* lval_sexpr() {
     lval* v = malloc(sizeof(lval));
     v->type = LVAL_SEXPR;
     v->count = 0;
     v->cell = NULL;
     return v;
 }
+
+/* A pointer to a new empty Qexpr lval */
+lval* lval_qexpr() {
+    lval* v = malloc(sizeof(lval));
+    v->type = LVAL_QEXPR;
+    v->count = 0;
+    v->cell = NULL;
+    return v;
+}
+
 
 void lval_del(lval* v) {
     switch (v->type) {
@@ -89,7 +95,8 @@ void lval_del(lval* v) {
         case LVAL_ERR: free(v->err); break;
         case LVAL_SYM: free(v->sym); break;
 
-        /* if sexpr then delete all elements inside */
+        /* if sexpr or qexpr  then delete all elements inside */
+        case LVAL_QEXPR:
         case LVAL_SEXPR:
             for(size_t i = 0; i < v->count; i++) {
                 lval_del(v->cell[i]);
@@ -101,17 +108,17 @@ void lval_del(lval* v) {
     free(v);
 }
 
-lval* lval_read_num(mpc_ast_t* t) {
-    errno = 0;
-    long x = strtol(t->contents, NULL, 10);
-    return errno != ERANGE ? lval_num(x) : lval_err("invalid number!");
-}
-
 lval* lval_add(lval* v, lval* x) {
     v->count++;
     v->cell = realloc(v->cell, sizeof(lval*) * v->count);
     v->cell[v->count - 1] = x;
     return v;
+}
+
+lval* lval_read_num(mpc_ast_t* t) {
+    errno = 0;
+    long x = strtol(t->contents, NULL, 10);
+    return errno != ERANGE ? lval_num(x) : lval_err("invalid number!");
 }
 
 lval* lval_read(mpc_ast_t* t) {
@@ -123,6 +130,7 @@ lval* lval_read(mpc_ast_t* t) {
     lval* x = NULL;
     if(strcmp(t->tag, ">") == 0) { x = lval_sexpr(); }
     if(strstr(t->tag, "sexpr")) { x = lval_sexpr(); }
+    if(strstr(t->tag, "qexpr")) { x = lval_qexpr(); }
 
     /* fill this list with any valide expression contained within */
     for(size_t i = 0; i < t->children_num; i++) {
@@ -141,7 +149,6 @@ void lval_expr_print(lval* v, char open, char close) {
     for(size_t i = 0; i < v->count; i++) {
         lval_print(v->cell[i]);
         
-
         /* do not print trailing space if last element */
         if(i != (v->count-1)) {
             putchar(' ');
@@ -156,12 +163,14 @@ void lval_print(lval* v) {
         case LVAL_ERR: printf("ERROR: %s", v->err); break;
         case LVAL_SYM: printf("%s", v->sym); break;
         case LVAL_SEXPR: lval_expr_print(v, '(', ')'); break;
+        case LVAL_QEXPR: lval_expr_print(v, '{', '}'); break;
+
     }
 }
 
 void lval_println(lval* v) { lval_print(v); putchar('\n'); }
 
-/* tool func */
+/* tools func */
 lval* lval_pop(lval* v, int i) {
     /* find the item at "i" */
     lval* x = v->cell[i];
@@ -265,6 +274,7 @@ int main(int argc, char** argv) {
     mpc_parser_t* Number   = mpc_new("number");
     mpc_parser_t* Symbol   = mpc_new("symbol");
     mpc_parser_t* Sexpr    = mpc_new("sexpr");
+    mpc_parser_t* Qexpr    = mpc_new("qexpr");
     mpc_parser_t* Expr     = mpc_new("expr");
     mpc_parser_t* Jisp     = mpc_new("jisp");
 
@@ -276,10 +286,11 @@ int main(int argc, char** argv) {
             symbol: '+' | '-' | '*' | '/' | '%' |                  \
             \"add\" | \"sub\" | \"mul\" | \"div\" |;               \
             sexpr: '(' <expr>* ')';                                \
-            expr: <number> | <symbol> | <sexpr>;                   \
+            qexpr: '{' <expr>* '}';                                \
+            expr: <number> | <symbol> | <sexpr> | <qexpr>;         \
             jisp: /^/ <expr>* /$/;                                 \
         ",
-    Number, Symbol, Sexpr, Expr, Jisp
+    Number, Symbol, Sexpr, Qexpr, Expr, Jisp
     );
     
     puts("\nJisp Version 0.0.0.0.1");
@@ -309,7 +320,7 @@ int main(int argc, char** argv) {
         free(input);
     }
 
-    mpc_cleanup(5, Number, Symbol, Sexpr, Expr, Jisp);
+    mpc_cleanup(5, Number, Symbol, Sexpr, Qexpr, Expr, Jisp);
 
     return 0;
 }
