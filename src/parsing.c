@@ -23,6 +23,13 @@ void add_history(char* unused){}
 #endif
 
 #define QUIT "quit()"
+struct lval;
+struct lenv;
+typedef lval lval;
+typedef lenv lenv;
+
+enum {LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_FUN, LVAL_QEXPR};
+typedef lval* (*lbuiltin)(lenv*, lval*);
 
 typedef struct lval
 {
@@ -33,10 +40,12 @@ typedef struct lval
     char* sym;
     /* count and pointer to a list of "lval*" */
     int count;
-    struct lval** cell;
+
+    lbuiltin fun;
+    lval** cell;
 } lval;
 
-enum {LVAL_NUM, LVAL_ERR, LVAL_SYM, LVAL_SEXPR, LVAL_QEXPR};
+
 
 void lval_print(lval* v);
 lval* lval_eval(lval* v);
@@ -283,8 +292,7 @@ int main(int argc, char** argv) {
     mpca_lang(MPCA_LANG_DEFAULT, 
         "                                                          \
             number: /-?[0-9]+/;                                    \
-            symbol: '+' | '-' | '*' | '/' | '%' |                  \
-            \"add\" | \"sub\" | \"mul\" | \"div\" |;               \
+            symbol : /[a-zA-Z0-9_+\\-*\\/\\\\=<>!&]+/ ;            \
             sexpr: '(' <expr>* ')';                                \
             qexpr: '{' <expr>* '}';                                \
             expr: <number> | <symbol> | <sexpr> | <qexpr>;         \
